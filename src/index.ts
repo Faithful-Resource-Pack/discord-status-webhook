@@ -1,7 +1,5 @@
-require('dotenv').config();
+import 'dotenv/config';
 import { WebhookClient, EmbedBuilder } from 'discord.js';
-// fuck you typescript for forcing me to still use this
-import fetch from 'node-fetch';
 import { StatusPageIncident, StatusPageResult } from './interfaces/StatusPage';
 import { DateTime } from 'luxon';
 import Keyv from 'keyv';
@@ -28,7 +26,7 @@ console.info(`Starting with webhook ${hook.id}`);
 
 if (!existsSync('./data')) {
 	console.info('Creating Database file');
-    mkdirSync('./data');
+	mkdirSync('./data');
 	appendFile('data.sqlite', '', function (err) {
 		if (err) throw err;
 	});
@@ -39,12 +37,12 @@ function embedFromIncident(incident: StatusPageIncident): EmbedBuilder {
 		incident.status === 'resolved' || incident.status === 'postmortem'
 			? EMBED_COLOR_GREEN
 			: incident.impact === 'critical'
-			? EMBED_COLOR_RED
-			: incident.impact === 'major'
-			? EMBED_COLOR_ORANGE
-			: incident.impact === 'minor'
-			? EMBED_COLOR_YELLOW
-			: EMBED_COLOR_BLACK;
+				? EMBED_COLOR_RED
+				: incident.impact === 'major'
+					? EMBED_COLOR_ORANGE
+					: incident.impact === 'minor'
+						? EMBED_COLOR_YELLOW
+						: EMBED_COLOR_BLACK;
 
 	const affectedNames = incident.components.map((c) => c.name);
 
@@ -58,7 +56,10 @@ function embedFromIncident(incident: StatusPageIncident): EmbedBuilder {
 	for (const update of incident.incident_updates.reverse()) {
 		const updateDT = DateTime.fromISO(update.created_at);
 		const timeString = `<t:${Math.floor(updateDT.toSeconds())}:R>`;
-		embed.addFields({ name: `${update.status.charAt(0).toUpperCase()}${update.status.slice(1)} ${timeString}`, value: update.body });
+		embed.addFields({
+			name: `${update.status.charAt(0).toUpperCase()}${update.status.slice(1)} ${timeString}`,
+			value: update.body,
+		});
 	}
 
 	const descriptionParts = [`• Impact: ${incident.impact}`];
@@ -94,10 +95,17 @@ async function updateIncident(incident: StatusPageIncident, messageID?: string) 
 	}
 }
 
+async function getResults(): Promise<StatusPageResult> {
+	const fetched = await fetch(`${API_BASE}/incidents.json`);
+	return fetched.json() as Promise<StatusPageResult>;
+}
+
 async function check() {
 	//console.info('heartbeat');
 	try {
-		const json = (await fetch(`${API_BASE}/incidents.json`).then((r) => r.json())) as StatusPageResult;
+		const json = await getResults().catch(() => null);
+		// discord down
+		if (json === null) return;
 		const { incidents } = json;
 
 		for (const incident of incidents.reverse()) {
